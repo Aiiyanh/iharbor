@@ -1,0 +1,733 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IHarbor Flower Shop</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        /* ── Auth Wall ─────────────────────────────────────────── */
+        #auth-wall {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            background: linear-gradient(160deg, #f0faf4 0%, #e8f5e9 60%, #c8e6c9 100%);
+            padding: 20px;
+            box-sizing: border-box;
+        }
+        .auth-card {
+            background: #fff;
+            border-radius: 20px;
+            box-shadow: 0 8px 40px rgba(39,174,96,.18);
+            padding: 40px 36px 36px;
+            width: 100%;
+            max-width: 420px;
+        }
+        .auth-brand {
+            text-align: center;
+            margin-bottom: 28px;
+        }
+        .auth-brand .auth-icon {
+            font-size: 2.8rem;
+            display: block;
+            margin-bottom: 8px;
+        }
+        .auth-brand h2 {
+            font-family: 'Dancing Script', cursive;
+            font-size: 2rem;
+            font-weight: 700;
+            color: #1a5e36;
+            margin: 0 0 4px;
+        }
+        .auth-brand p {
+            font-size: .9rem;
+            color: #7f8c8d;
+            margin: 0;
+        }
+        .auth-tabs {
+            display: flex;
+            background: #f4f9f6;
+            border-radius: 12px;
+            padding: 4px;
+            margin-bottom: 24px;
+            gap: 4px;
+        }
+        .auth-tabs button {
+            flex: 1;
+            border: none;
+            background: transparent;
+            padding: 10px;
+            border-radius: 9px;
+            font-size: .95rem;
+            font-weight: 600;
+            color: #7f8c8d;
+            cursor: pointer;
+            transition: all .2s;
+        }
+        .auth-tabs button.active {
+            background: #27ae60;
+            color: #fff;
+            box-shadow: 0 2px 8px rgba(39,174,96,.35);
+        }
+        .auth-form {
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+        }
+        .auth-form .field-group label {
+            display: block;
+            font-size: .82rem;
+            font-weight: 600;
+            color: #555;
+            margin-bottom: 6px;
+            letter-spacing: .3px;
+        }
+        .auth-form .field-group input {
+            width: 100%;
+            padding: 12px 14px;
+            border: 1.5px solid #dfe6e9;
+            border-radius: 10px;
+            font-size: .95rem;
+            box-sizing: border-box;
+            transition: border-color .2s;
+            outline: none;
+            background: #fdfdfd;
+            font-family: inherit;
+        }
+        .auth-form .field-group input:focus {
+            border-color: #27ae60;
+            background: #fff;
+        }
+        .auth-submit-btn {
+            background: linear-gradient(135deg, #27ae60, #2ecc71);
+            color: #fff;
+            border: none;
+            padding: 13px;
+            border-radius: 12px;
+            font-size: 1rem;
+            font-weight: 700;
+            cursor: pointer;
+            margin-top: 4px;
+            transition: opacity .2s, transform .1s;
+            letter-spacing: .3px;
+            width: 100%;
+        }
+        .auth-submit-btn:hover  { opacity: .92; }
+        .auth-submit-btn:active { transform: scale(.98); }
+        .auth-submit-btn:disabled { opacity: .6; cursor: not-allowed; }
+        #auth-error {
+            display: none;
+            background: #fdecea;
+            color: #c0392b;
+            border: 1px solid #f5b7b1;
+            border-radius: 10px;
+            padding: 10px 14px;
+            font-size: .88rem;
+            font-weight: 500;
+            text-align: center;
+            margin-bottom: 8px;
+        }
+
+        /* ── Shop top bar (user greeting + hamburger menu) ──────── */
+        #shop-topbar {
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 14px;
+            padding: 10px 20px;
+            background: rgba(39,174,96,.92);
+            position: sticky;
+            top: 0;
+            z-index: 900;
+        }
+        #user-greeting {
+            color: rgba(255,255,255,.9);
+            font-size: .9rem;
+            font-weight: 500;
+        }
+
+        /* ── Combined hamburger menu (Cart + Sign Out) ──────────── */
+        #menu-wrapper {
+            position: relative;
+        }
+        #menu-toggle-btn {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: transparent;
+            border: 2px solid rgba(255,255,255,.6);
+            color: #fff;
+            padding: 7px 14px;
+            border-radius: 20px;
+            font-size: .85rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background .2s;
+            position: relative;
+        }
+        #menu-toggle-btn:hover { background: rgba(255,255,255,.18); }
+
+        .hamburger-icon {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            gap: 4px;
+            width: 18px;
+            height: 14px;
+        }
+        .hamburger-icon span {
+            display: block;
+            width: 100%;
+            height: 2px;
+            background: #fff;
+            border-radius: 2px;
+            transition: transform .25s, opacity .2s;
+        }
+        #menu-toggle-btn.open .hamburger-icon span:nth-child(1) {
+            transform: translateY(6px) rotate(45deg);
+        }
+        #menu-toggle-btn.open .hamburger-icon span:nth-child(2) {
+            opacity: 0;
+        }
+        #menu-toggle-btn.open .hamburger-icon span:nth-child(3) {
+            transform: translateY(-6px) rotate(-45deg);
+        }
+
+        #cart-count-badge {
+            position: absolute;
+            top: -6px;
+            right: -6px;
+            background: #e74c3c;
+            color: #fff;
+            font-size: .68rem;
+            font-weight: 700;
+            min-width: 17px;
+            height: 17px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0 3px;
+            line-height: 1;
+            box-shadow: 0 0 0 2px rgba(39,174,96,.92);
+        }
+        #cart-count-badge.hidden { display: none; }
+
+        /* Small notification dot shown when an order's status changes
+           while the customer isn't looking at the My Orders modal. */
+        .update-dot {
+            display: inline-block;
+            width: 9px;
+            height: 9px;
+            border-radius: 50%;
+            background: #e74c3c;
+            box-shadow: 0 0 0 2px #fff;
+        }
+        .update-dot.hidden { display: none; }
+        #menu-update-dot {
+            position: absolute;
+            top: -3px;
+            left: -3px;
+            box-shadow: 0 0 0 2px rgba(39,174,96,.92);
+            animation: dotPulse 1.6s ease-in-out infinite;
+        }
+        #orders-update-dot {
+            margin-left: auto;
+        }
+        @keyframes dotPulse {
+            0%, 100% { transform: scale(1); opacity: 1; }
+            50%      { transform: scale(1.25); opacity: .8; }
+        }
+
+        #dropdown-menu {
+            position: absolute;
+            top: calc(100% + 10px);
+            right: 0;
+            background: #fff;
+            border-radius: 14px;
+            box-shadow: 0 10px 35px rgba(0,0,0,.18);
+            min-width: 190px;
+            overflow: hidden;
+            opacity: 0;
+            transform: translateY(-8px) scale(.97);
+            pointer-events: none;
+            transition: opacity .18s ease, transform .18s ease;
+            z-index: 950;
+        }
+        #dropdown-menu.show {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+            pointer-events: auto;
+        }
+        #dropdown-menu button {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            width: 100%;
+            background: none;
+            border: none;
+            text-align: left;
+            padding: 13px 18px;
+            font-size: .92rem;
+            font-weight: 600;
+            color: #2c3e50;
+            cursor: pointer;
+            transition: background .15s;
+        }
+        #dropdown-menu button:hover { background: #f4f9f6; }
+        #dropdown-menu .menu-icon { font-size: 1.05rem; line-height: 1; }
+        #dropdown-menu .menu-divider {
+            height: 1px;
+            background: #eef2ee;
+            margin: 0;
+        }
+        #dropdown-menu #menu-logout-item { color: #c0392b; }
+        #dropdown-menu .menu-badge {
+            margin-left: auto;
+            background: #eafaf0;
+            color: #1a5e36;
+            font-size: .75rem;
+            font-weight: 700;
+            border-radius: 12px;
+            padding: 2px 8px;
+        }
+
+        /* ── Orders Modal ────────────────────────────────────────── */
+        .orders-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.6);
+            z-index: 1001;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            backdrop-filter: blur(5px);
+        }
+        .orders-content {
+            background: #fff;
+            padding: 40px;
+            border-radius: 20px;
+            max-width: 90%;
+            max-height: 80%;
+            overflow-y: auto;
+            width: 620px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            animation: modalAppear 0.3s ease;
+        }
+        .orders-content h2 {
+            margin-top: 0;
+            margin-bottom: 25px;
+            text-align: center;
+            color: #2c3e50;
+            font-size: 2rem;
+            font-weight: 600;
+        }
+        #orders-list {
+            list-style: none;
+            margin-bottom: 20px;
+            max-height: 420px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+        .order-card {
+            border: 1px solid #ecf0f1;
+            border-radius: 14px;
+            padding: 18px 20px;
+            background: #fafdfb;
+        }
+        .order-card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+        .order-card-date {
+            font-size: .82rem;
+            color: #7f8c8d;
+        }
+        .order-card-items {
+            font-size: .92rem;
+            color: #2c3e50;
+            margin-bottom: 8px;
+            line-height: 1.5;
+        }
+        .order-card-footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: .95rem;
+            color: #2c3e50;
+        }
+        .order-card-total {
+            font-weight: 700;
+            color: #e74c3c;
+        }
+        .status-pill {
+            display: inline-block;
+            font-size: .76rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: .4px;
+            padding: 4px 12px;
+            border-radius: 14px;
+            white-space: nowrap;
+        }
+        .status-new       { background: #fff4d6; color: #a9760a; }
+        .status-confirmed { background: #d6eaff; color: #1a5fb4; }
+        .status-preparing { background: #e6dcfb; color: #6c3fc0; }
+        .status-ready,
+        .status-out-for-delivery { background: #d4f3e0; color: #1a8a4f; }
+        .status-completed,
+        .status-delivered { background: #d9f2e0; color: #1a5e36; }
+        .status-cancelled { background: #fbdada; color: #c0392b; }
+        #orders-empty-msg {
+            text-align: center;
+            color: #7f8c8d;
+            font-style: italic;
+            padding: 30px 10px;
+        }
+        #orders-loading-msg {
+            text-align: center;
+            color: #7f8c8d;
+            padding: 30px 10px;
+        }
+        .orders-content .close-btn {
+            background: linear-gradient(135deg, #e74c3c, #c0392b);
+            color: #fff;
+            border: none;
+            padding: 12px 25px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: 600;
+            width: 100%;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            box-shadow: 0 4px 15px rgba(231, 76, 60, 0.3);
+            transition: all 0.3s ease;
+        }
+        .orders-content .close-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(231, 76, 60, 0.4);
+        }
+
+        @media (max-width: 768px) {
+            .orders-content { padding: 25px; width: 95%; }
+            .orders-content h2 { font-size: 1.5rem; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- ══════════════════════════════════════════════════════════
+         AUTH WALL  — shown to logged-out visitors
+    ══════════════════════════════════════════════════════════════ -->
+    <div id="auth-wall">
+        <div class="auth-card">
+
+            <div class="auth-brand">
+                <span class="auth-icon">🌸</span>
+                <h2>IHarbor</h2>
+                <p>Sign in to browse and place orders</p>
+            </div>
+
+            <!-- Tab switcher -->
+            <div class="auth-tabs">
+                <button id="tab-login"  onclick="switchAuthTab('login')"  class="active">Sign In</button>
+                <button id="tab-signup" onclick="switchAuthTab('signup')">Create Account</button>
+            </div>
+
+            <!-- Error box (shared) -->
+            <div id="auth-error"></div>
+
+            <!-- LOGIN -->
+            <form id="login-form" class="auth-form" novalidate>
+                <div class="field-group">
+                    <label for="login-email">Email address</label>
+                    <input id="login-email" type="email" placeholder="you@email.com" required autocomplete="email" />
+                </div>
+                <div class="field-group">
+                    <label for="login-password">Password</label>
+                    <input id="login-password" type="password" placeholder="Your password" required autocomplete="current-password" />
+                </div>
+                <button id="login-btn" type="submit" class="auth-submit-btn">Sign In</button>
+            </form>
+
+            <!-- SIGN UP (hidden by default) -->
+            <form id="signup-form" class="auth-form" style="display:none;" novalidate>
+                <div class="field-group">
+                    <label for="signup-name">Full name</label>
+                    <input id="signup-name" type="text" placeholder="e.g. Maria Santos" required autocomplete="name" />
+                </div>
+                <div class="field-group">
+                    <label for="signup-email">Email address</label>
+                    <input id="signup-email" type="email" placeholder="you@email.com" required autocomplete="email" />
+                </div>
+                <div class="field-group">
+                    <label for="signup-password">Password</label>
+                    <input id="signup-password" type="password" placeholder="At least 6 characters" required autocomplete="new-password" />
+                </div>
+                <div class="field-group">
+                    <label for="signup-confirm">Confirm password</label>
+                    <input id="signup-confirm" type="password" placeholder="Repeat password" required autocomplete="new-password" />
+                </div>
+                <button id="signup-btn" type="submit" class="auth-submit-btn">Create Account</button>
+            </form>
+
+        </div>
+    </div>
+
+
+    <!-- ══════════════════════════════════════════════════════════
+         SHOP  — shown only after login
+    ══════════════════════════════════════════════════════════════ -->
+    <div id="shop-content" style="display:none;">
+
+        <!-- Top bar: greeting + combined hamburger menu (Cart + Sign Out) -->
+        <div id="shop-topbar">
+            <span id="user-greeting"></span>
+
+            <div id="menu-wrapper">
+                <button id="menu-toggle-btn" onclick="toggleMainMenu()" aria-haspopup="true" aria-expanded="false">
+                    <span class="hamburger-icon">
+                        <span></span><span></span><span></span>
+                    </span>
+                    <span id="cart-count-badge" class="hidden">0</span>
+                    <span id="menu-update-dot" class="update-dot hidden"></span>
+                </button>
+
+                <div id="dropdown-menu">
+                    <button id="menu-cart-item" onclick="handleMenuCartClick()">
+                        <span class="menu-icon">🛒</span>
+                        <span>Cart</span>
+                        <span id="menu-cart-count" class="menu-badge">0</span>
+                    </button>
+                    <div class="menu-divider"></div>
+                    <button id="menu-orders-item" onclick="handleMenuOrdersClick()">
+                        <span class="menu-icon">📦</span>
+                        <span>My Orders</span>
+                        <span id="orders-update-dot" class="update-dot hidden" aria-label="Order status updated"></span>
+                    </button>
+                    <div class="menu-divider"></div>
+                    <button id="menu-logout-item" onclick="handleMenuLogoutClick()">
+                        <span class="menu-icon">🚪</span>
+                        <span>Sign Out</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- ── Your original shop HTML (unchanged) ────────────── -->
+        <div id="shop-container">
+            <div id="background-image"></div>
+
+            <div class="about-us">
+                <h1>IHarbor</h1>
+                <div class="descript">
+                    <h1>We offer a wide variety of fresh bouquets for all occasions. And souvenirs.</h1>
+                </div>
+            </div>
+
+            <div class="category-buttons">
+                <button onclick="showCategory('bouquets')" class="active">Bouquets</button>
+                <button onclick="showCategory('souvenirs')">Souvenirs</button>
+            </div>
+
+            <!-- Bouquets -->
+            <div id="bouquets-section" class="products">
+                <div class="product-item">
+                    <img src="images/rose.jpg" alt="Rose Bouquet" />
+                    <p class="price">₱29.99</p>
+                    <p>Rose bouquets</p>
+                    <button class="add-to-cart" data-name="Rose Bouquet" data-price="29.99">Add to Cart</button>
+                </div>
+                <div class="product-item">
+                    <img src="images/sunflower.jpg" alt="Sunflower" />
+                    <p class="price">₱34.99</p>
+                    <p>Sunflower</p>
+                    <button class="add-to-cart" data-name="Sunflower" data-price="34.99">Add to Cart</button>
+                </div>
+                <div class="product-item">
+                    <img src="images/tulips.jpg" alt="Tulips" />
+                    <p class="price">₱400.00</p>
+                    <p>Tulips</p>
+                    <button class="add-to-cart" data-name="Tulips" data-price="400.00">Add to Cart</button>
+                </div>
+                <div class="product-item">
+                    <img src="images/fuzzy.jpg" alt="Fuzzy Flowers" />
+                    <p class="price">₱25.99</p>
+                    <p>Fuzzy Flowers</p>
+                    <button class="add-to-cart" data-name="Fuzzy Flowers" data-price="25.99">Add to Cart</button>
+                </div>
+                <div class="product-item">
+                    <img src="images/chocolate.jpg" alt="Chocolate Cosmos" />
+                    <p class="price">₱39.99</p>
+                    <p>Chocolate Cosmos</p>
+                    <button class="add-to-cart" data-name="Chocolate Cosmos" data-price="39.99">Add to Cart</button>
+                </div>
+                <div class="product-item">
+                    <img src="images/butterfly.jpg" alt="Butterfly Bush" />
+                    <p class="price">₱32.99</p>
+                    <p>Butterfly Bush</p>
+                    <button class="add-to-cart" data-name="Butterfly Bush" data-price="32.99">Add to Cart</button>
+                </div>
+                <div class="product-item">
+                    <img src="images/satin.jpg" alt="Satin Bouquet" />
+                    <p class="price">₱42.99</p>
+                    <p>Satin Bouquet</p>
+                    <button class="add-to-cart" data-name="Satin Bouquet" data-price="42.99">Add to Cart</button>
+                </div>
+            </div>
+
+            <!-- Souvenirs -->
+            <div id="souvenirs-section" class="products" style="display:none;">
+                <div class="product-item">
+                    <img src="images/keychain.jpg" alt="Keychain" />
+                    <p class="price">₱5.99</p>
+                    <p>Keychain</p>
+                    <button class="add-to-cart" data-name="Keychain" data-price="5.99">Add to Cart</button>
+                </div>
+                <div class="product-item">
+                    <img src="images/mug.jpg" alt="Custom Mug" />
+                    <p class="price">₱10.99</p>
+                    <p>Custom Mug</p>
+                    <button class="add-to-cart" data-name="Custom Mug" data-price="10.99">Add to Cart</button>
+                </div>
+                <div class="product-item">
+                    <img src="images/photo-frame.jpg" alt="Photo Frame" />
+                    <p class="price">₱15.99</p>
+                    <p>Photo Frame</p>
+                    <button class="add-to-cart" data-name="Photo Frame" data-price="15.99">Add to Cart</button>
+                </div>
+            </div>
+
+            <!-- Cart Modal -->
+            <div id="cart-modal" class="cart-modal" style="display:none;">
+                <div class="cart-content">
+                    <h2>Your Cart</h2>
+                    <ul id="cart-items"></ul>
+                    <div class="cart-buttons">
+                        <button onclick="checkout()" class="checkout-btn">Checkout</button>
+                        <button onclick="toggleCart()" class="close-btn">Close</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Orders Modal -->
+            <div id="orders-modal" class="orders-modal" style="display:none;">
+                <div class="orders-content">
+                    <h2>My Orders</h2>
+                    <div id="orders-loading-msg">Loading your orders…</div>
+                    <ul id="orders-list" style="display:none;"></ul>
+                    <div id="orders-empty-msg" style="display:none;">You haven't placed any orders yet.</div>
+                    <button onclick="toggleOrders()" class="close-btn">Close</button>
+                </div>
+            </div>
+
+            <!-- Customer Details Form -->
+            <div id="checkout-form" class="checkout-form" style="display:none;">
+                <div class="form-content">
+                    <h2>Please Enter your Details</h2>
+                    <form id="customer-details-form">
+                        <input type="text" id="customer-name" placeholder="Your Name" required />
+                        <input type="tel" id="customer-phone" placeholder="Your Phone Number" required />
+                        <label for="delivery-option">Select Delivery Option:</label>
+                        <select id="delivery-option" required>
+                            <option value="">Choose delivery option</option>
+                            <option value="pickup">Pick Up (No Fee)</option>
+                            <option value="meetup">Meet Up (₱50 Fee)</option>
+                            <option value="delivery">Delivery (₱100 Fee)</option>
+                        </select>
+                        <button type="submit">Submit Order</button>
+                        <button type="button" onclick="cancelCheckout()">Cancel</button>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Confirmation Section -->
+            <div id="confirmation-section" class="confirmation-section" style="display:none;">
+                <div class="confirmation-content">
+                    <h2>Thank You for Your Order!</h2>
+                    <div class="order-details">
+                        <p><strong>Name:</strong> <span id="customer-name-display"></span></p>
+                        <p><strong>Phone Number:</strong> <span id="customer-phone-display"></span></p>
+                        <p><strong>Delivery Option:</strong> <span id="delivery-option-display"></span></p>
+                        <p><strong>Total Price:</strong> ₱<span id="total-price-display"></span></p>
+                    </div>
+                    <div class="confirmation-buttons">
+                        <button onclick="finishCheckout()" class="finish-btn">Finish</button>
+                        <button onclick="cancelCheckout()" class="cancel-btn">Cancel</button>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+        <!-- end #shop-container -->
+
+    </div>
+    <!-- end #shop-content -->
+
+    <!-- ══════════════════════════════════════════════════════════
+         Combined menu UI logic (open/close dropdown)
+         Cart, Orders, and Logout actions are wired to functions
+         defined in scripts.js
+    ══════════════════════════════════════════════════════════════ -->
+    <script>
+        function toggleMainMenu() {
+            const dropdown = document.getElementById('dropdown-menu');
+            const btn = document.getElementById('menu-toggle-btn');
+            const isOpen = dropdown.classList.contains('show');
+            if (isOpen) {
+                dropdown.classList.remove('show');
+                btn.classList.remove('open');
+                btn.setAttribute('aria-expanded', 'false');
+            } else {
+                dropdown.classList.add('show');
+                btn.classList.add('open');
+                btn.setAttribute('aria-expanded', 'true');
+            }
+        }
+
+        function closeMainMenu() {
+            document.getElementById('dropdown-menu').classList.remove('show');
+            document.getElementById('menu-toggle-btn').classList.remove('open');
+            document.getElementById('menu-toggle-btn').setAttribute('aria-expanded', 'false');
+        }
+
+        function handleMenuCartClick() {
+            closeMainMenu();
+            if (typeof toggleCart === 'function') toggleCart();
+        }
+
+        function handleMenuOrdersClick() {
+            closeMainMenu();
+            if (typeof toggleOrders === 'function') toggleOrders();
+        }
+
+        function handleMenuLogoutClick() {
+            closeMainMenu();
+            if (typeof handleLogout === 'function') handleLogout();
+        }
+
+        // Close the dropdown when clicking outside of it
+        document.addEventListener('click', function (e) {
+            const wrapper = document.getElementById('menu-wrapper');
+            if (wrapper && !wrapper.contains(e.target)) {
+                closeMainMenu();
+            }
+        });
+    </script>
+
+    <script type="module" src="scripts.js"></script>
+</body>
+</html>
