@@ -21,7 +21,8 @@ import {
   signInWithEmailAndPassword,
   signOut,
   onAuthStateChanged,
-  updateProfile
+  updateProfile,
+  sendPasswordResetEmail
 } from "https://www.gstatic.com/firebasejs/11.9.1/firebase-auth.js";
 
 const firebaseConfig = {
@@ -73,26 +74,39 @@ function showShop(user) {
   startMyOrdersListener();
 }
 
-// ─── Tab Switcher (Login ↔ Sign Up) ──────────────────────────────────────────
+// ─── Tab Switcher (Login ↔ Sign Up ↔ Forgot Password) ────────────────────────
 function switchAuthTab(tab) {
   const loginForm  = document.getElementById('login-form');
   const signupForm = document.getElementById('signup-form');
+  const forgotForm = document.getElementById('forgot-form');
   const loginTab   = document.getElementById('tab-login');
   const signupTab  = document.getElementById('tab-signup');
 
   clearAuthError();
 
+  // Hide all forms first, then show the one requested
+  loginForm.style.display  = 'none';
+  signupForm.style.display = 'none';
+  forgotForm.style.display = 'none';
+
   if (tab === 'login') {
-    loginForm.style.display  = 'flex';
-    signupForm.style.display = 'none';
+    loginForm.style.display = 'flex';
     loginTab.classList.add('active');
     signupTab.classList.remove('active');
-  } else {
-    loginForm.style.display  = 'none';
+  } else if (tab === 'signup') {
     signupForm.style.display = 'flex';
     loginTab.classList.remove('active');
     signupTab.classList.add('active');
+  } else if (tab === 'forgot') {
+    forgotForm.style.display = 'flex';
+    loginTab.classList.remove('active');
+    signupTab.classList.remove('active');
   }
+}
+
+// Shown when the user clicks "Forgot password?" on the login form
+function showForgotPassword() {
+  switchAuthTab('forgot');
 }
 
 // ─── Auth Error Display ───────────────────────────────────────────────────────
@@ -103,7 +117,7 @@ function showAuthError(message) {
 
 function clearAuthError() {
   const el = document.getElementById('auth-error');
-  if (el) { el.textContent = ''; el.style.display = 'none'; }
+  if (el) { el.textContent = ''; el.style.display = 'none'; el.style.color = ''; }
 }
 
 // Maps Firebase error codes to friendly messages
@@ -140,6 +154,30 @@ async function handleLogin(e) {
     showAuthError(friendlyAuthError(err.code));
     btn.disabled    = false;
     btn.textContent = 'Sign In';
+  }
+}
+
+// ─── Forgot Password ──────────────────────────────────────────────────────────
+async function handleForgotPassword(e) {
+  e.preventDefault();
+  clearAuthError();
+
+  const email = document.getElementById('forgot-email').value.trim();
+  const btn   = document.getElementById('forgot-btn');
+
+  btn.disabled    = true;
+  btn.textContent = 'Sending…';
+
+  try {
+    await sendPasswordResetEmail(auth, email);
+    showAuthError('If an account exists for this email, a reset link has been sent. Please check your inbox (and spam folder).');
+    document.getElementById('auth-error').style.color = '#2e7d4f';
+  } catch (err) {
+    document.getElementById('auth-error').style.color = '';
+    showAuthError(friendlyAuthError(err.code));
+  } finally {
+    btn.disabled    = false;
+    btn.textContent = 'Send Reset Link';
   }
 }
 
@@ -250,6 +288,7 @@ document.addEventListener('DOMContentLoaded', function () {
   // Auth form submissions
   document.getElementById('login-form').addEventListener('submit', handleLogin);
   document.getElementById('signup-form').addEventListener('submit', handleSignup);
+  document.getElementById('forgot-form').addEventListener('submit', handleForgotPassword);
 
   // Admin password modal — submit on Enter
   const pwInput = document.getElementById('admin-pw-input');
@@ -1086,6 +1125,7 @@ function escHtml(str) {
 // ─── Expose globals used by inline onclick handlers ───────────────────────────
 window.showCategory       = showCategory;
 window.switchAuthTab      = switchAuthTab;
+window.showForgotPassword = showForgotPassword;
 window.handleLogout       = handleLogout;
 window.toggleCart         = toggleCart;
 window.toggleOrders       = toggleOrders;
