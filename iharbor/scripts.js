@@ -239,6 +239,9 @@ async function handleLogout() {
 // ─── Cart State ───────────────────────────────────────────────────────────────
 let cart      = [];
 let cartCount = 0;
+let cartItemIdCounter  = 0;        // gives each cart entry a stable id so selection survives re-renders
+let selectedCartItemIds = new Set(); // ids of items the customer wants to include in checkout
+let checkoutItems       = [];       // snapshot of selected items, captured when Checkout is clicked
 
 // ─── Persistent Cart (Firestore) ──────────────────────────────────────────────
 // Cart is saved to carts/{userId} so it survives page refresh and tab close.
@@ -264,8 +267,9 @@ async function loadCart() {
     const snap = await getDoc(doc(db, 'carts', user.uid));
     if (snap.exists()) {
       const saved = snap.data().items || [];
-      cart      = saved.map(i => ({ name: i.name, price: parseFloat(i.price), quantity: i.quantity, notes: i.notes || '' }));
+      cart      = saved.map(i => ({ id: ++cartItemIdCounter, name: i.name, price: parseFloat(i.price), quantity: i.quantity, notes: i.notes || '' }));
       cartCount = cart.reduce((s, i) => s + i.quantity, 0);
+      selectedCartItemIds = new Set(cart.map(i => i.id)); // select everything by default
       updateCartButton();
     }
   } catch (err) {
@@ -372,7 +376,9 @@ function addToCart(name, price, qty, notes) {
   if (existing) {
     existing.quantity += qty;
   } else {
-    cart.push({ name, price: parseFloat(price), quantity: qty, notes });
+    const newItem = { id: ++cartItemIdCounter, name, price: parseFloat(price), quantity: qty, notes };
+    cart.push(newItem);
+    selectedCartItemIds.add(newItem.id); // newly added items are selected by default
   }
   cartCount += qty;
   updateCartButton();
@@ -423,16 +429,44 @@ function updateCartDisplay() {
   const cartItems = document.getElementById('cart-items');
   cartItems.innerHTML = '';
 
+  // Drop ids for items that no longer exist in the cart (e.g. after Remove).
+  // Note: we don't auto-(re)select items here — that would override a
+  // deliberate uncheck on every re-render. New items are already selected
+  // at the point they're added (see addToCart / loadCart).
+  const currentIds = new Set(cart.map(i => i.id));
+  Array.from(selectedCartItemIds).forEach(id => {
+    if (!currentIds.has(id)) selectedCartItemIds.delete(id);
+  });
+
   if (cart.length === 0) {
     cartItems.innerHTML = '<li style="text-align:center;color:#7f8c8d;font-style:italic;padding:20px;">Your cart is empty</li>';
     return;
   }
 
+  // "Select All" row
+  const allSelected = cart.every(i => selectedCartItemIds.has(i.id));
+  const selectAllLi = document.createElement('li');
+  selectAllLi.style.cssText = 'display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid #eee;';
+  selectAllLi.innerHTML = `
+    <input type="checkbox" id="cart-select-all" ${allSelected ? 'checked' : ''} style="width:18px;height:18px;cursor:pointer;flex-shrink:0;" />
+    <label for="cart-select-all" style="font-weight:600;color:#2c3e50;cursor:pointer;font-size:.95rem;">Select All</label>`;
+  cartItems.appendChild(selectAllLi);
+  selectAllLi.querySelector('#cart-select-all').addEventListener('change', function () {
+    if (this.checked) {
+      cart.forEach(i => selectedCartItemIds.add(i.id));
+    } else {
+      selectedCartItemIds.clear();
+    }
+    updateCartDisplay();
+  });
+
   let total = 0;
   cart.forEach((item, index) => {
+    const checked = selectedCartItemIds.has(item.id);
     const li = document.createElement('li');
-    li.style.cssText = 'display:flex;justify-content:space-between;align-items:center;padding:15px 0;border-bottom:1px solid #eee;';
+    li.style.cssText = 'display:flex;justify-content:space-between;align-items:center;padding:15px 0;border-bottom:1px solid #eee;gap:12px;';
     li.innerHTML = `
+      <input type="checkbox" class="cart-item-checkbox" data-id="${item.id}" ${checked ? 'checked' : ''} style="width:18px;height:18px;flex-shrink:0;cursor:pointer;" />
       <div style="flex:1;">
         <strong style="font-size:1.1rem;">${item.name}</strong><br>
         <span style="color:#7f8c8d;font-size:.9rem;">Qty: ${item.quantity} × ₱${item.price.toFixed(2)}</span>
@@ -445,12 +479,18 @@ function updateCartDisplay() {
           border-radius:15px;cursor:pointer;font-size:.8rem;">Remove</button>
       </div>`;
     cartItems.appendChild(li);
-    total += item.quantity * item.price;
+    if (checked) total += item.quantity * item.price;
+
+    li.querySelector('.cart-item-checkbox').addEventListener('change', function () {
+      const id = parseInt(this.dataset.id, 10);
+      if (this.checked) selectedCartItemIds.add(id); else selectedCartItemIds.delete(id);
+      updateCartDisplay();
+    });
   });
 
   const totalLi = document.createElement('li');
   totalLi.style.cssText = 'border-top:2px solid #27ae60;margin-top:15px;padding-top:15px;font-weight:bold;font-size:1.3rem;display:flex;justify-content:space-between;align-items:center;';
-  totalLi.innerHTML = `<div style="flex:1;">Total:</div><div style="color:#27ae60;">₱${total.toFixed(2)}</div>`;
+  totalLi.innerHTML = `<div style="flex:1;">Selected Total:</div><div style="color:#27ae60;">₱${total.toFixed(2)}</div>`;
   cartItems.appendChild(totalLi);
 }
 
@@ -465,6 +505,13 @@ function removeFromCart(index) {
 // ─── Checkout Flow ────────────────────────────────────────────────────────────
 function checkout() {
   if (cart.length === 0) { alert('Your cart is empty!'); return; }
+
+  checkoutItems = cart.filter(i => selectedCartItemIds.has(i.id));
+  if (checkoutItems.length === 0) {
+    alert('Please select at least one item to checkout.');
+    return;
+  }
+
   document.getElementById('cart-modal').style.display    = 'none';
   document.getElementById('checkout-form').style.display = 'flex';
   document.body.style.overflow = 'hidden';
@@ -537,9 +584,9 @@ function processCheckout() {
     return;
   }
 
-  // ── No delivery fee at checkout: total is simply the sum of cart items.
+  // ── No delivery fee at checkout: total is the sum of the selected items.
   //    The admin adds a delivery fee afterward from the dashboard if needed. ──
-  let total = cart.reduce((s, i) => s + i.quantity * i.price, 0);
+  let total = checkoutItems.reduce((s, i) => s + i.quantity * i.price, 0);
   let deliveryText = '';
 
   switch (deliveryOption) {
@@ -622,7 +669,7 @@ async function recordOrder() {
     pinLat:          pendingPinLat,
     pinLng:          pendingPinLng,
     total:          parseFloat(document.getElementById('total-price-display').textContent),
-    items:          cart.map(i => ({ name: i.name, price: i.price, quantity: i.quantity, notes: i.notes || '' })),
+    items:          checkoutItems.map(i => ({ name: i.name, price: i.price, quantity: i.quantity, notes: i.notes || '' })),
     status:         'New'
   };
 
@@ -636,8 +683,14 @@ async function recordOrder() {
 async function finishCheckout() {
   await recordOrder();
 
-  cart      = [];
-  cartCount = 0;
+  // Remove only the items that were checked out — anything the customer
+  // left unchecked stays in the cart for next time.
+  const checkedOutIds = new Set(checkoutItems.map(i => i.id));
+  cart      = cart.filter(i => !checkedOutIds.has(i.id));
+  cartCount = cart.reduce((s, i) => s + i.quantity, 0);
+  selectedCartItemIds = new Set(cart.map(i => i.id)); // keep remaining items selected by default
+  checkoutItems = [];
+
   pendingPinLat = null;
   pendingPinLng = null;
   pendingMapAddress = '';
@@ -649,7 +702,13 @@ async function finishCheckout() {
   userPinMarker = null;
   storeMap = null;
   updateCartButton();
-  clearSavedCart();
+
+  // Persist whatever's left in the cart, or clear it if nothing remains
+  if (cart.length > 0) {
+    await saveCart();
+  } else {
+    await clearSavedCart();
+  }
 
   document.getElementById('customer-details-form').reset();
   document.getElementById('surprise-note-wrapper').style.display = 'none';
@@ -657,6 +716,10 @@ async function finishCheckout() {
   document.body.style.overflow = 'auto';
 
   alert('Thank you for your order! We will contact you soon to confirm the details.');
+
+  // Reload so the shop starts fresh (empty cart view, reset scroll, etc.)
+  // once the customer has acknowledged the confirmation message.
+  window.location.reload();
 }
 
 function cancelCheckout() {
@@ -670,6 +733,7 @@ function cancelCheckout() {
   pendingLandmark     = '';
   pendingIsSurprise   = false;
   pendingSurpriseNote = '';
+  checkoutItems = [];
 }
 
 // ─── Orders ("My Orders") ──────────────────────────────────────────────────────
