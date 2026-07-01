@@ -1042,7 +1042,6 @@ async function loadManageProductsList() {
 async function renderProductsFromFirestore() {
   try {
     const snap = await getDocs(query(collection(db, 'products'), orderBy('createdAt', 'asc')));
-    if (snap.empty) return; // keep hardcoded items if no products added yet
 
     const bouquetsEl  = document.getElementById('bouquets-section');
     const souvenirsEl = document.getElementById('souvenirs-section');
@@ -1050,6 +1049,13 @@ async function renderProductsFromFirestore() {
     // Clear only dynamically-added items (those with data-dynamic="true")
     bouquetsEl.querySelectorAll('[data-dynamic]').forEach(el => el.remove());
     souvenirsEl.querySelectorAll('[data-dynamic]').forEach(el => el.remove());
+
+    if (snap.empty) {
+      const emptyMsg = '<p data-dynamic="true" style="color:#7f8c8d;font-style:italic;padding:20px 0;">No products yet — check back soon!</p>';
+      bouquetsEl.innerHTML  = emptyMsg;
+      souvenirsEl.innerHTML = emptyMsg;
+      return;
+    }
 
     snap.forEach(d => {
       const p       = d.data();
