@@ -243,6 +243,15 @@ window.printReceipt = function (orderId) {
       <td class="label">Phone</td>
       <td class="value" style="text-align:right;">${escapeHtml(order.customerPhone)}</td>
     </tr>
+    ${order.hasOtherReceiver ? `
+    <tr>
+      <td class="label">Receiver</td>
+      <td class="value" style="text-align:right;">${escapeHtml(order.receiverName || '')}</td>
+    </tr>
+    <tr>
+      <td class="label">Receiver Phone</td>
+      <td class="value" style="text-align:right;">${escapeHtml(order.receiverPhone || '')}</td>
+    </tr>` : ''}
     <tr>
       <td class="label">Delivery</td>
       <td class="value" style="text-align:right;">${escapeHtml(order.deliveryOption)}</td>
@@ -472,6 +481,7 @@ function renderOrders(orders) {
         <div class="order-card-body">
           <p><strong>Customer:</strong> ${escapeHtml(order.customerName)}</p>
           <p><strong>Phone:</strong> ${escapeHtml(order.customerPhone)}</p>
+          ${order.hasOtherReceiver ? `<p><strong>Receiver:</strong> 🎁 ${escapeHtml(order.receiverName || '')} — ${escapeHtml(order.receiverPhone || '')}</p>` : ''}
           <p><strong>Delivery:</strong> ${escapeHtml(order.deliveryOption)}</p>
           ${order.deliveryAddress ? `<p><strong>Address:</strong> ${escapeHtml(order.deliveryAddress)}</p>` : ''}
           ${order.landmark ? `<p><strong>Landmark:</strong> 📍 ${escapeHtml(order.landmark)}</p>` : ''}
