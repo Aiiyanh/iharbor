@@ -432,12 +432,12 @@ function clearProductSearch() {
 // ─── Quantity & Notes Modal ───────────────────────────────────────────────────
 let _qnPending = null;
 
-function openQtyNotesModal(name, price) {
+function openQtyNotesModal(name, price, prefillNotes) {
   _qnPending = { name, price: parseFloat(price) };
   document.getElementById('qn-product-name').textContent  = name;
   document.getElementById('qn-product-price').textContent = '\u20B1' + parseFloat(price).toFixed(2);
   document.getElementById('qn-qty-display').textContent   = '1';
-  document.getElementById('qn-notes-input').value         = '';
+  document.getElementById('qn-notes-input').value         = prefillNotes || '';
   const modal = document.getElementById('qty-notes-modal');
   modal.style.display = 'flex';
   document.body.style.overflow = 'hidden';
@@ -462,6 +462,96 @@ function qnConfirm() {
   const notes = document.getElementById('qn-notes-input').value.trim();
   addToCart(_qnPending.name, _qnPending.price, qty, notes);
   qnClose();
+}
+
+// ─── Add-ons Selection Modal (customer-facing) ────────────────────────────────
+let _addonsForProduct   = null;        // { name, basePrice } of the product awaiting add-ons
+let _availableAddons    = [];          // [{ id, name, price }] loaded fresh each time the modal opens
+let _selectedAddonIds   = new Set();
+
+async function openAddonsModal(name, price) {
+  _addonsForProduct = { name, basePrice: parseFloat(price) };
+  _selectedAddonIds = new Set();
+
+  const listEl  = document.getElementById('addons-modal-list');
+  const emptyEl = document.getElementById('addons-modal-empty');
+  listEl.innerHTML = '<p style="text-align:center;color:#95a5a6;font-size:.9rem;padding:14px 0;">Loading add-ons…</p>';
+  emptyEl.style.display = 'none';
+
+  const modal = document.getElementById('addons-modal');
+  modal.style.display = 'flex';
+  document.body.style.overflow = 'hidden';
+
+  try {
+    const snap = await getDocs(query(collection(db, 'addons'), orderBy('createdAt', 'asc')));
+    _availableAddons = [];
+    snap.forEach(d => {
+      const a = d.data();
+      _availableAddons.push({ id: d.id, name: a.name, price: parseFloat(a.price), image: a.image || '' });
+    });
+
+    if (_availableAddons.length === 0) {
+      listEl.innerHTML = '';
+      emptyEl.style.display = 'block';
+    } else {
+      listEl.innerHTML = '';
+      _availableAddons.forEach(a => {
+        const row = document.createElement('label');
+        row.className = 'addon-row';
+        row.innerHTML = `
+          <input type="checkbox" data-addon-id="${a.id}" />
+          ${a.image ? `<img src="${escHtml(a.image)}" alt="${escHtml(a.name)}" class="addon-row-thumb" onerror="this.style.display='none'" />` : ''}
+          <span class="addon-row-name">${escHtml(a.name)}</span>
+          <span class="addon-row-price">+₱${a.price.toFixed(2)}</span>`;
+        row.querySelector('input').addEventListener('change', function () {
+          if (this.checked) _selectedAddonIds.add(a.id);
+          else _selectedAddonIds.delete(a.id);
+          updateAddonsModalTotal();
+        });
+        listEl.appendChild(row);
+      });
+    }
+    updateAddonsModalTotal();
+  } catch (err) {
+    console.error('Could not load add-ons:', err);
+    listEl.innerHTML = '<p style="text-align:center;color:#c0392b;font-size:.9rem;">Could not load add-ons.</p>';
+  }
+}
+
+function updateAddonsModalTotal() {
+  const total = _availableAddons
+    .filter(a => _selectedAddonIds.has(a.id))
+    .reduce((sum, a) => sum + a.price, 0);
+  document.getElementById('addons-modal-total').textContent = 'Selected: \u20B1' + total.toFixed(2);
+}
+
+function closeAddonsModal() {
+  document.getElementById('addons-modal').style.display = 'none';
+  document.body.style.overflow = 'auto';
+  _addonsForProduct = null;
+  _selectedAddonIds = new Set();
+}
+
+function addonsModalContinue() {
+  if (!_addonsForProduct) return;
+  const selected = _availableAddons.filter(a => _selectedAddonIds.has(a.id));
+  const addonsTotal = selected.reduce((sum, a) => sum + a.price, 0);
+  const totalPrice  = _addonsForProduct.basePrice + addonsTotal;
+
+  const prefillNotes = selected.length
+    ? 'Add-ons: ' + selected.map(a => `${a.name} (+₱${a.price.toFixed(2)})`).join(', ')
+    : '';
+
+  const { name } = _addonsForProduct;
+  closeAddonsModal();
+  openQtyNotesModal(name, totalPrice, prefillNotes);
+}
+
+function addonsModalSkip() {
+  if (!_addonsForProduct) return;
+  const { name, basePrice } = _addonsForProduct;
+  closeAddonsModal();
+  openQtyNotesModal(name, basePrice, '');
 }
 
 // ─── Cart Helpers ─────────────────────────────────────────────────────────────
@@ -1323,6 +1413,8 @@ function submitAdminPassword() {
 // ── Add / Edit Modal ──────────────────────────────────────────────────────────
 function openAddItemModal() {
   clearAddItemForm();
+  clearAddonForm();
+  switchManageTab('products');
   document.getElementById('add-item-modal').style.display = 'flex';
   document.body.style.overflow = 'hidden';
   loadManageProductsList();
@@ -1332,6 +1424,30 @@ function closeAddItemModal() {
   document.getElementById('add-item-modal').style.display = 'none';
   document.body.style.overflow = 'auto';
   adminUnlocked = false;
+}
+
+// ── Products / Add-ons tab switcher ────────────────────────────────────────────
+function switchManageTab(tab) {
+  const productsPanel = document.getElementById('manage-products-panel');
+  const addonsPanel   = document.getElementById('manage-addons-panel');
+  const productsTab   = document.getElementById('manage-tab-products');
+  const addonsTab     = document.getElementById('manage-tab-addons');
+
+  const activeStyle   = 'flex:1;padding:10px;border-radius:10px;border:1.5px solid #27ae60;background:#27ae60;color:#fff;font-weight:700;cursor:pointer;';
+  const inactiveStyle = 'flex:1;padding:10px;border-radius:10px;border:1.5px solid #27ae60;background:#fff;color:#27ae60;font-weight:700;cursor:pointer;';
+
+  if (tab === 'addons') {
+    productsPanel.style.display = 'none';
+    addonsPanel.style.display   = 'block';
+    productsTab.setAttribute('style', inactiveStyle);
+    addonsTab.setAttribute('style', activeStyle);
+    loadManageAddonsList();
+  } else {
+    productsPanel.style.display = 'block';
+    addonsPanel.style.display   = 'none';
+    productsTab.setAttribute('style', activeStyle);
+    addonsTab.setAttribute('style', inactiveStyle);
+  }
 }
 
 function clearAddItemForm() {
@@ -1439,6 +1555,102 @@ async function loadManageProductsList() {
   }
 }
 
+// ── Add-on Management (used by the "🎀 Add-ons" tab) ──────────────────────────
+let addonsCache = {}; // id -> addon data, populated when the admin list loads
+
+function clearAddonForm() {
+  document.getElementById('edit-addon-id').value  = '';
+  document.getElementById('addon-name').value     = '';
+  document.getElementById('addon-price').value    = '';
+  document.getElementById('addon-image').value    = '';
+  document.getElementById('add-addon-error').textContent = '';
+  document.getElementById('add-addon-title').textContent = '🎀 Add New Add-on';
+}
+
+async function saveAddon() {
+  const id    = document.getElementById('edit-addon-id').value.trim();
+  const name  = document.getElementById('addon-name').value.trim();
+  const price = parseFloat(document.getElementById('addon-price').value);
+  const image = document.getElementById('addon-image').value.trim();
+  const errEl = document.getElementById('add-addon-error');
+
+  if (!name)                     { errEl.textContent = 'Please enter an add-on name.'; return; }
+  if (isNaN(price) || price < 0) { errEl.textContent = 'Please enter a valid price.';   return; }
+  errEl.textContent = '';
+
+  const data = { name, price, image: image || '', updatedAt: serverTimestamp() };
+
+  try {
+    if (id) {
+      await setDoc(doc(db, 'addons', id), data, { merge: true });
+    } else {
+      data.createdAt = serverTimestamp();
+      await addDoc(collection(db, 'addons'), data);
+    }
+    clearAddonForm();
+    loadManageAddonsList();
+  } catch (err) {
+    console.error('Failed to save add-on:', err);
+    errEl.textContent = 'Could not save. Please try again.';
+  }
+}
+
+function editAddon(id) {
+  const a = addonsCache[id];
+  if (!a) return;
+  document.getElementById('edit-addon-id').value = id;
+  document.getElementById('addon-name').value    = a.name || '';
+  document.getElementById('addon-price').value   = a.price;
+  document.getElementById('addon-image').value   = a.image || '';
+  document.getElementById('add-addon-title').textContent = '✏️ Edit Add-on';
+  document.getElementById('addon-name').focus();
+}
+
+async function deleteAddon(id) {
+  if (!confirm('Delete this add-on?')) return;
+  try {
+    await deleteDoc(doc(db, 'addons', id));
+    loadManageAddonsList();
+  } catch (err) {
+    console.error('Failed to delete add-on:', err);
+    alert('Could not delete add-on.');
+  }
+}
+
+async function loadManageAddonsList() {
+  const listEl = document.getElementById('manage-addons-list');
+  if (!listEl) return;
+  listEl.innerHTML = '<li style="color:#7f8c8d;font-size:.85rem;">Loading…</li>';
+
+  try {
+    const snap = await getDocs(query(collection(db, 'addons'), orderBy('createdAt', 'asc')));
+    if (snap.empty) {
+      listEl.innerHTML = '<li style="color:#7f8c8d;font-size:.85rem;font-style:italic;">No add-ons yet.</li>';
+      addonsCache = {};
+      return;
+    }
+    listEl.innerHTML = '';
+    addonsCache = {};
+    snap.forEach(d => {
+      const a = d.data();
+      addonsCache[d.id] = a;
+      const li = document.createElement('li');
+      li.className = 'manage-product-row';
+      li.innerHTML = `
+        ${a.image ? `<img src="${escHtml(a.image)}" alt="${escHtml(a.name)}" style="width:34px;height:34px;border-radius:8px;object-fit:cover;margin-right:8px;flex-shrink:0;" onerror="this.style.display='none'" />` : ''}
+        <div class="mp-info">
+          <div class="mp-name">${escHtml(a.name)}</div>
+          <div class="mp-meta">₱${parseFloat(a.price).toFixed(2)}</div>
+        </div>
+        <button class="mp-edit"  onclick="editAddon('${d.id}')">Edit</button>
+        <button class="mp-delete" onclick="deleteAddon('${d.id}')">✕</button>`;
+      listEl.appendChild(li);
+    });
+  } catch (err) {
+    listEl.innerHTML = '<li style="color:#c0392b;font-size:.85rem;">Could not load add-ons.</li>';
+  }
+}
+
 // ── Render Firestore products into the shop sections ─────────────────────────
 async function renderProductsFromFirestore() {
   try {
@@ -1469,7 +1681,10 @@ async function renderProductsFromFirestore() {
         <p class="price">₱${parseFloat(p.price).toFixed(2)}</p>
         <p>${escHtml(p.name)}</p>
         ${p.description ? '<button type="button" class="see-more-btn">See more</button>' : ''}
-        <button class="add-to-cart" data-name="${escHtml(p.name)}" data-price="${p.price}">Add to Cart</button>`;
+        <div style="display:flex;gap:8px;">
+          <button class="add-to-cart" data-name="${escHtml(p.name)}" data-price="${p.price}" style="flex:1;">Add to Cart</button>
+          <button type="button" class="addons-btn" data-name="${escHtml(p.name)}" data-price="${p.price}" style="flex:0 0 auto;padding:0 12px;">🎀 Add-ons</button>
+        </div>`;
       // Wire up the add-to-cart button
       div.querySelector('.add-to-cart').addEventListener('click', function () {
         openQtyNotesModal(this.dataset.name, this.dataset.price);
@@ -1488,6 +1703,10 @@ async function renderProductsFromFirestore() {
           openDescriptionModal(p.name, p.price, p.description);
         });
       }
+      // Wire up the "Add-ons" button
+      div.querySelector('.addons-btn').addEventListener('click', function () {
+        openAddonsModal(this.dataset.name, this.dataset.price);
+      });
       section.appendChild(div);
     });
   } catch (err) {
@@ -1570,3 +1789,12 @@ window.openQtyNotesModal  = openQtyNotesModal;
 window.qnChangeQty        = qnChangeQty;
 window.qnClose            = qnClose;
 window.qnConfirm          = qnConfirm;
+window.openAddonsModal    = openAddonsModal;
+window.closeAddonsModal   = closeAddonsModal;
+window.addonsModalContinue = addonsModalContinue;
+window.addonsModalSkip    = addonsModalSkip;
+window.switchManageTab    = switchManageTab;
+window.saveAddon          = saveAddon;
+window.clearAddonForm     = clearAddonForm;
+window.editAddon          = editAddon;
+window.deleteAddon        = deleteAddon;
