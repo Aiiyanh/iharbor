@@ -72,7 +72,26 @@ function showShop(user) {
   loadCart();
   renderProductsFromFirestore();
   startMyOrdersListener();
+  adjustSearchBarOffset();
 }
+
+// ─── Keep the sticky search bar clear of the top bar ──────────────────────────
+function adjustSearchBarOffset() {
+  const topbar        = document.getElementById('shop-topbar');
+  const searchWrapper = document.getElementById('product-search-wrapper');
+  if (!topbar || !searchWrapper) return;
+
+  const style = getComputedStyle(topbar);
+  if (style.position === 'fixed' || style.position === 'sticky') {
+    // Topbar stays pinned on scroll too — stack the search bar right beneath it
+    searchWrapper.style.top = topbar.offsetHeight + 'px';
+  } else {
+    // Topbar scrolls away normally — search bar can stick to the very top
+    searchWrapper.style.top = '0px';
+  }
+}
+window.addEventListener('resize', adjustSearchBarOffset);
+window.addEventListener('load', adjustSearchBarOffset);
 
 // ─── Tab Switcher (Login ↔ Sign Up ↔ Forgot Password) ────────────────────────
 function switchAuthTab(tab) {
@@ -315,10 +334,24 @@ document.addEventListener('DOMContentLoaded', function () {
 });
 
 // ─── Category Toggle ──────────────────────────────────────────────────────────
+let activeCategory = 'bouquets';
+
 function showCategory(category) {
+  activeCategory = category;
+
   const bouquetsSection  = document.getElementById('bouquets-section');
   const souvenirsSection = document.getElementById('souvenirs-section');
   const buttons          = document.querySelectorAll('.category-buttons button');
+
+  // Switching category tabs clears any active product search
+  const searchInput = document.getElementById('product-search-input');
+  if (searchInput) searchInput.value = '';
+  const clearBtn = document.getElementById('search-clear-btn');
+  if (clearBtn) clearBtn.classList.add('hidden');
+  const noResultsEl = document.getElementById('search-no-results');
+  if (noResultsEl) noResultsEl.style.display = 'none';
+  bouquetsSection.querySelectorAll('.product-item').forEach(el => el.style.display = '');
+  souvenirsSection.querySelectorAll('.product-item').forEach(el => el.style.display = '');
 
   buttons.forEach(b => b.classList.remove('active'));
 
@@ -331,6 +364,69 @@ function showCategory(category) {
     souvenirsSection.style.display = 'grid';
     buttons[1].classList.add('active');
   }
+}
+
+// ─── Product Search ───────────────────────────────────────────────────────────
+function filterProducts(rawTerm) {
+  const term            = (rawTerm || '').trim().toLowerCase();
+  const bouquetsSection  = document.getElementById('bouquets-section');
+  const souvenirsSection = document.getElementById('souvenirs-section');
+  const buttons          = document.querySelectorAll('.category-buttons button');
+  const clearBtn         = document.getElementById('search-clear-btn');
+  const noResultsEl      = document.getElementById('search-no-results');
+
+  if (!term) {
+    // No search term: restore the normal single-category view
+    if (clearBtn) clearBtn.classList.add('hidden');
+    if (noResultsEl) noResultsEl.style.display = 'none';
+    bouquetsSection.querySelectorAll('.product-item').forEach(el => el.style.display = '');
+    souvenirsSection.querySelectorAll('.product-item').forEach(el => el.style.display = '');
+    showCategoryDisplayOnly(activeCategory);
+    return;
+  }
+
+  if (clearBtn) clearBtn.classList.remove('hidden');
+
+  // While searching, show matching items from BOTH categories at once
+  bouquetsSection.style.display  = 'grid';
+  souvenirsSection.style.display = 'grid';
+  buttons.forEach(b => b.classList.remove('active'));
+
+  let matchCount = 0;
+  [bouquetsSection, souvenirsSection].forEach(section => {
+    section.querySelectorAll('.product-item').forEach(item => {
+      const nameEl = item.querySelector('p:not(.price)');
+      const name   = nameEl ? nameEl.textContent.toLowerCase() : '';
+      const match  = name.includes(term);
+      item.style.display = match ? '' : 'none';
+      if (match) matchCount++;
+    });
+  });
+
+  if (noResultsEl) noResultsEl.style.display = matchCount === 0 ? 'block' : 'none';
+}
+
+// Helper: toggle section visibility for a category without touching the search box
+function showCategoryDisplayOnly(category) {
+  const bouquetsSection  = document.getElementById('bouquets-section');
+  const souvenirsSection = document.getElementById('souvenirs-section');
+  const buttons          = document.querySelectorAll('.category-buttons button');
+  buttons.forEach(b => b.classList.remove('active'));
+  if (category === 'bouquets') {
+    bouquetsSection.style.display  = 'grid';
+    souvenirsSection.style.display = 'none';
+    buttons[0].classList.add('active');
+  } else {
+    bouquetsSection.style.display  = 'none';
+    souvenirsSection.style.display = 'grid';
+    buttons[1].classList.add('active');
+  }
+}
+
+function clearProductSearch() {
+  const searchInput = document.getElementById('product-search-input');
+  if (searchInput) searchInput.value = '';
+  filterProducts('');
 }
 
 // ─── Quantity & Notes Modal ───────────────────────────────────────────────────
@@ -1244,6 +1340,7 @@ function clearAddItemForm() {
   document.getElementById('ai-price').value      = '';
   document.getElementById('ai-category').value   = 'bouquets';
   document.getElementById('ai-image').value      = '';
+  document.getElementById('ai-description').value = '';
   document.getElementById('add-item-error').textContent = '';
   document.getElementById('add-item-title').textContent = '➕ Add New Item';
 }
@@ -1255,13 +1352,14 @@ async function saveItem() {
   const price    = parseFloat(document.getElementById('ai-price').value);
   const category = document.getElementById('ai-category').value;
   const image    = document.getElementById('ai-image').value.trim();
+  const description = document.getElementById('ai-description').value.trim();
   const errEl    = document.getElementById('add-item-error');
 
   if (!name)           { errEl.textContent = 'Please enter a product name.'; return; }
   if (isNaN(price) || price < 0) { errEl.textContent = 'Please enter a valid price.'; return; }
   errEl.textContent = '';
 
-  const data = { name, price, category, image: image || '', updatedAt: serverTimestamp() };
+  const data = { name, price, category, image: image || '', description: description || '', updatedAt: serverTimestamp() };
 
   try {
     if (id) {
@@ -1280,12 +1378,17 @@ async function saveItem() {
 }
 
 // ── Edit ──────────────────────────────────────────────────────────────────────
-function editItem(id, name, price, category, image) {
+let productsCache = {}; // id -> product data, populated when the admin list loads
+
+function editItem(id) {
+  const p = productsCache[id];
+  if (!p) return;
   document.getElementById('edit-item-id').value  = id;
-  document.getElementById('ai-name').value       = name;
-  document.getElementById('ai-price').value      = price;
-  document.getElementById('ai-category').value   = category;
-  document.getElementById('ai-image').value      = image || '';
+  document.getElementById('ai-name').value       = p.name || '';
+  document.getElementById('ai-price').value      = p.price;
+  document.getElementById('ai-category').value   = p.category || 'bouquets';
+  document.getElementById('ai-image').value      = p.image || '';
+  document.getElementById('ai-description').value = p.description || '';
   document.getElementById('add-item-title').textContent = '✏️ Edit Item';
   document.getElementById('ai-name').focus();
 }
@@ -1316,8 +1419,10 @@ async function loadManageProductsList() {
       return;
     }
     listEl.innerHTML = '';
+    productsCache = {};
     snap.forEach(d => {
       const p  = d.data();
+      productsCache[d.id] = p;
       const li = document.createElement('li');
       li.className = 'manage-product-row';
       li.innerHTML = `
@@ -1325,7 +1430,7 @@ async function loadManageProductsList() {
           <div class="mp-name">${escHtml(p.name)}</div>
           <div class="mp-meta">₱${parseFloat(p.price).toFixed(2)} · ${escHtml(p.category)}</div>
         </div>
-        <button class="mp-edit"  onclick="editItem('${d.id}','${escHtml(p.name)}',${p.price},'${p.category}','${escHtml(p.image||'')}')">Edit</button>
+        <button class="mp-edit"  onclick="editItem('${d.id}')">Edit</button>
         <button class="mp-delete" onclick="deleteItem('${d.id}')">✕</button>`;
       listEl.appendChild(li);
     });
@@ -1363,6 +1468,7 @@ async function renderProductsFromFirestore() {
         ${p.image ? `<img src="${escHtml(p.image)}" alt="${escHtml(p.name)}" style="cursor:zoom-in;" onerror="this.style.display='none'" />` : '<div style="height:120px;background:#f0faf4;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:2rem;">🌸</div>'}
         <p class="price">₱${parseFloat(p.price).toFixed(2)}</p>
         <p>${escHtml(p.name)}</p>
+        ${p.description ? '<button type="button" class="see-more-btn">See more</button>' : ''}
         <button class="add-to-cart" data-name="${escHtml(p.name)}" data-price="${p.price}">Add to Cart</button>`;
       // Wire up the add-to-cart button
       div.querySelector('.add-to-cart').addEventListener('click', function () {
@@ -1373,6 +1479,13 @@ async function renderProductsFromFirestore() {
       if (imgEl) {
         imgEl.addEventListener('click', function () {
           openImageLightbox(this.src, this.alt);
+        });
+      }
+      // Wire up the "See more" button to open the description modal
+      const seeMoreBtn = div.querySelector('.see-more-btn');
+      if (seeMoreBtn) {
+        seeMoreBtn.addEventListener('click', function () {
+          openDescriptionModal(p.name, p.price, p.description);
         });
       }
       section.appendChild(div);
@@ -1406,8 +1519,28 @@ function closeImageLightbox() {
   document.body.style.overflow = '';
 }
 
+// ── Product description modal ("See more") ────────────────────────────────
+function openDescriptionModal(name, price, description) {
+  const modal = document.getElementById('description-modal');
+  if (!modal) return;
+  document.getElementById('desc-product-name').textContent  = name || '';
+  document.getElementById('desc-product-price').textContent = '\u20B1' + parseFloat(price || 0).toFixed(2);
+  document.getElementById('desc-product-text').textContent  = description || '';
+  modal.style.display = 'flex';
+  document.body.style.overflow = 'hidden';
+}
+
+function closeDescriptionModal() {
+  const modal = document.getElementById('description-modal');
+  if (!modal) return;
+  modal.style.display = 'none';
+  document.body.style.overflow = '';
+}
+
 // ─── Expose globals used by inline onclick handlers ───────────────────────────
 window.showCategory       = showCategory;
+window.filterProducts     = filterProducts;
+window.clearProductSearch = clearProductSearch;
 window.switchAuthTab      = switchAuthTab;
 window.showForgotPassword = showForgotPassword;
 window.handleLogout       = handleLogout;
@@ -1423,6 +1556,7 @@ window.toggleOtherReceiver = toggleOtherReceiver;
 window.applyMapAddress    = applyMapAddress;
 window.openImageLightbox  = openImageLightbox;
 window.closeImageLightbox = closeImageLightbox;
+window.closeDescriptionModal = closeDescriptionModal;
 window.searchMapLocation  = searchMapLocation;
 window.initStoreMap       = initStoreMap;
 window.openAdminPwModal   = openAdminPwModal;
