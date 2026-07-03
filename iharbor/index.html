@@ -201,6 +201,20 @@ We offer wide variety of fresh bouquets, customized bouquets, handmade bouquets 
                     <form id="customer-details-form">
                         <input type="text" id="customer-name" placeholder="Your Name" required />
                         <input type="tel" id="customer-phone" placeholder="Your Phone Number" required />
+
+                        <div class="other-receiver-check">
+                            <label for="other-receiver-checkbox" style="display:flex;align-items:center;gap:8px;font-weight:600;color:#2c3e50;cursor:pointer;">
+                                <input type="checkbox" id="other-receiver-checkbox" onchange="toggleOtherReceiver()" style="width:auto;margin:0;" />
+                                This order is for someone else? (other receiver)
+                            </label>
+                        </div>
+                        <div id="other-receiver-wrapper" style="display:none;">
+                            <label for="receiver-name">Receiver's Name</label>
+                            <input type="text" id="receiver-name" placeholder="Recipient's full name" />
+                            <label for="receiver-phone">Receiver's Phone Number</label>
+                            <input type="tel" id="receiver-phone" placeholder="Recipient's phone number" />
+                        </div>
+
                         <label for="delivery-option">Select Delivery Option:</label>
                         <select id="delivery-option" required onchange="toggleAddressField()">
                             <option value="">Choose delivery option</option>
@@ -267,6 +281,7 @@ We offer wide variety of fresh bouquets, customized bouquets, handmade bouquets 
                     <div class="order-details">
                         <p><strong>Name:</strong> <span id="customer-name-display"></span></p>
                         <p><strong>Phone Number:</strong> <span id="customer-phone-display"></span></p>
+                        <p id="receiver-display-row" style="display:none;"><strong>Receiver:</strong> <span id="receiver-name-display"></span> — <span id="receiver-phone-display"></span></p>
                         <p><strong>Delivery Option:</strong> <span id="delivery-option-display"></span></p>
                         <p id="address-display-row" style="display:none;"><strong>Delivery Address:</strong> <span id="delivery-address-display"></span></p>
                         <p id="landmark-display-row" style="display:none;"><strong>Landmark:</strong> <span id="delivery-landmark-display"></span></p>
@@ -341,6 +356,12 @@ We offer wide variety of fresh bouquets, customized bouquets, handmade bouquets 
 
     </div>
     <!-- end #shop-content -->
+
+    <!-- ── Image Lightbox (full photo view) ───────────────────────────── -->
+    <div id="image-lightbox" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:1200;align-items:center;justify-content:center;cursor:zoom-out;" onclick="closeImageLightbox()">
+        <span id="lightbox-close-btn" onclick="closeImageLightbox()" style="position:absolute;top:18px;right:24px;color:#fff;font-size:2.2rem;line-height:1;cursor:pointer;font-weight:300;">&times;</span>
+        <img id="lightbox-img" src="" alt="" style="max-width:92%;max-height:88%;border-radius:12px;box-shadow:0 12px 40px rgba(0,0,0,.5);" />
+    </div>
 
     <!-- ── Quantity & Notes Modal ─────────────────────────────────────── -->
     <div id="qty-notes-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:1100;align-items:center;justify-content:center;">
@@ -432,4 +453,3 @@ We offer wide variety of fresh bouquets, customized bouquets, handmade bouquets 
     <script type="module" src="scripts.js"></script>
 </body>
 </html>
-
