@@ -551,6 +551,18 @@ function toggleSurpriseNote() {
   }
 }
 
+function toggleOtherReceiver() {
+  const checked = document.getElementById('other-receiver-checkbox').checked;
+  const wrapper = document.getElementById('other-receiver-wrapper');
+  if (wrapper) wrapper.style.display = checked ? 'block' : 'none';
+  if (!checked) {
+    const nameInput  = document.getElementById('receiver-name');
+    const phoneInput = document.getElementById('receiver-phone');
+    if (nameInput)  nameInput.value  = '';
+    if (phoneInput) phoneInput.value = '';
+  }
+}
+
 function processCheckout() {
   const customerName   = document.getElementById('customer-name').value.trim();
   const customerPhone  = document.getElementById('customer-phone').value.trim();
@@ -561,9 +573,17 @@ function processCheckout() {
   const deliveryTime    = document.getElementById('delivery-time').value;
   const isSurprise      = document.getElementById('is-surprise').value === 'yes';
   const surpriseNote    = document.getElementById('surprise-note').value.trim();
+  const hasOtherReceiver = document.getElementById('other-receiver-checkbox').checked;
+  const receiverName     = document.getElementById('receiver-name').value.trim();
+  const receiverPhone    = document.getElementById('receiver-phone').value.trim();
 
   if (!customerName || !customerPhone || !deliveryOption) {
     alert('Please fill in all required fields.');
+    return;
+  }
+
+  if (hasOtherReceiver && (!receiverName || !receiverPhone)) {
+    alert("Please enter the receiver's name and phone number.");
     return;
   }
 
@@ -612,6 +632,23 @@ function processCheckout() {
   pendingLandmark     = deliveryLandmark;
   pendingIsSurprise   = isSurprise;
   pendingSurpriseNote = isSurprise ? surpriseNote : '';
+  pendingHasOtherReceiver = hasOtherReceiver;
+  pendingReceiverName     = hasOtherReceiver ? receiverName  : '';
+  pendingReceiverPhone    = hasOtherReceiver ? receiverPhone : '';
+
+  // Show or hide receiver row in confirmation
+  const receiverRow = document.getElementById('receiver-display-row');
+  const receiverNameDisplay  = document.getElementById('receiver-name-display');
+  const receiverPhoneDisplay = document.getElementById('receiver-phone-display');
+  if (hasOtherReceiver) {
+    receiverNameDisplay.textContent  = receiverName;
+    receiverPhoneDisplay.textContent = receiverPhone;
+    receiverRow.style.display = 'block';
+  } else {
+    receiverNameDisplay.textContent  = '';
+    receiverPhoneDisplay.textContent = '';
+    receiverRow.style.display = 'none';
+  }
 
   // Show or hide address row in confirmation
   const addressRow = document.getElementById('address-display-row');
@@ -666,6 +703,9 @@ async function recordOrder() {
     deliveryTime:    pendingDeliveryTime || null,
     isSurprise:      pendingIsSurprise || false,
     surpriseNote:    pendingSurpriseNote || null,
+    hasOtherReceiver: pendingHasOtherReceiver || false,
+    receiverName:     pendingHasOtherReceiver ? (pendingReceiverName || null)  : null,
+    receiverPhone:    pendingHasOtherReceiver ? (pendingReceiverPhone || null) : null,
     pinLat:          pendingPinLat,
     pinLng:          pendingPinLng,
     total:          parseFloat(document.getElementById('total-price-display').textContent),
@@ -699,6 +739,9 @@ async function finishCheckout() {
   pendingLandmark     = '';
   pendingIsSurprise   = false;
   pendingSurpriseNote = '';
+  pendingHasOtherReceiver = false;
+  pendingReceiverName     = '';
+  pendingReceiverPhone    = '';
   userPinMarker = null;
   storeMap = null;
   updateCartButton();
@@ -725,6 +768,7 @@ async function finishCheckout() {
 function cancelCheckout() {
   document.getElementById('customer-details-form').reset();
   document.getElementById('surprise-note-wrapper').style.display = 'none';
+  document.getElementById('other-receiver-wrapper').style.display = 'none';
   document.getElementById('checkout-form').style.display        = 'none';
   document.getElementById('confirmation-section').style.display = 'none';
   document.body.style.overflow = 'auto';
@@ -733,6 +777,9 @@ function cancelCheckout() {
   pendingLandmark     = '';
   pendingIsSurprise   = false;
   pendingSurpriseNote = '';
+  pendingHasOtherReceiver = false;
+  pendingReceiverName     = '';
+  pendingReceiverPhone    = '';
   checkoutItems = [];
 }
 
@@ -934,6 +981,9 @@ let pendingDeliveryTime = '';   // customer's chosen delivery/pickup time (HH:MM
 let pendingLandmark     = '';   // nearby landmark to help find the address
 let pendingIsSurprise   = false; // whether the order is a surprise for the recipient
 let pendingSurpriseNote = '';   // special instructions for surprise deliveries
+let pendingHasOtherReceiver = false; // whether the order is being placed for someone else
+let pendingReceiverName     = ''; // other receiver's name
+let pendingReceiverPhone    = ''; // other receiver's phone number
 
 function initStoreMap() {
   // Guard: if map already initialised, just invalidate size (fixes display after modal opens)
@@ -1310,7 +1360,7 @@ async function renderProductsFromFirestore() {
       div.className    = 'product-item';
       div.dataset.dynamic = 'true';
       div.innerHTML = `
-        ${p.image ? `<img src="${escHtml(p.image)}" alt="${escHtml(p.name)}" onerror="this.style.display='none'" />` : '<div style="height:120px;background:#f0faf4;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:2rem;">🌸</div>'}
+        ${p.image ? `<img src="${escHtml(p.image)}" alt="${escHtml(p.name)}" style="cursor:zoom-in;" onerror="this.style.display='none'" />` : '<div style="height:120px;background:#f0faf4;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:2rem;">🌸</div>'}
         <p class="price">₱${parseFloat(p.price).toFixed(2)}</p>
         <p>${escHtml(p.name)}</p>
         <button class="add-to-cart" data-name="${escHtml(p.name)}" data-price="${p.price}">Add to Cart</button>`;
@@ -1318,6 +1368,13 @@ async function renderProductsFromFirestore() {
       div.querySelector('.add-to-cart').addEventListener('click', function () {
         openQtyNotesModal(this.dataset.name, this.dataset.price);
       });
+      // Wire up the product image to open the full-photo lightbox
+      const imgEl = div.querySelector('img');
+      if (imgEl) {
+        imgEl.addEventListener('click', function () {
+          openImageLightbox(this.src, this.alt);
+        });
+      }
       section.appendChild(div);
     });
   } catch (err) {
@@ -1327,6 +1384,26 @@ async function renderProductsFromFirestore() {
 
 function escHtml(str) {
   return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
+// ── Full-photo lightbox ────────────────────────────────────────────────────
+function openImageLightbox(src, alt) {
+  const lightbox = document.getElementById('image-lightbox');
+  const img      = document.getElementById('lightbox-img');
+  if (!lightbox || !img) return;
+  img.src = src;
+  img.alt = alt || '';
+  lightbox.style.display = 'flex';
+  document.body.style.overflow = 'hidden';
+}
+
+function closeImageLightbox() {
+  const lightbox = document.getElementById('image-lightbox');
+  const img      = document.getElementById('lightbox-img');
+  if (!lightbox) return;
+  lightbox.style.display = 'none';
+  if (img) img.src = '';
+  document.body.style.overflow = '';
 }
 
 // ─── Expose globals used by inline onclick handlers ───────────────────────────
@@ -1342,7 +1419,10 @@ window.finishCheckout     = finishCheckout;
 window.cancelCheckout     = cancelCheckout;
 window.toggleAddressField = toggleAddressField;
 window.toggleSurpriseNote = toggleSurpriseNote;
+window.toggleOtherReceiver = toggleOtherReceiver;
 window.applyMapAddress    = applyMapAddress;
+window.openImageLightbox  = openImageLightbox;
+window.closeImageLightbox = closeImageLightbox;
 window.searchMapLocation  = searchMapLocation;
 window.initStoreMap       = initStoreMap;
 window.openAdminPwModal   = openAdminPwModal;
