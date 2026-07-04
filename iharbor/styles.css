@@ -177,6 +177,60 @@ body {
     box-shadow: 0 6px 20px rgba(46, 204, 113, 0.4);
 }
 
+/* ══════════════════════════════════════════════════════════════
+   Product Color-Variant Picker (storefront)
+   Round swatch buttons rendered below the product photo when a
+   product has color variants set up in the admin "Add Items" form.
+══════════════════════════════════════════════════════════════ */
+.color-swatch-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    align-items: center;
+    justify-content: center;
+    margin: 8px 0 2px;
+}
+
+.color-swatch {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    border: 2px solid #dfe6e9;
+    padding: 0;
+    cursor: pointer;
+    box-shadow: 0 1px 3px rgba(0,0,0,.15);
+    transition: transform .15s, border-color .15s, box-shadow .15s;
+}
+
+.color-swatch:hover {
+    transform: scale(1.1);
+}
+
+.color-swatch.active {
+    border-color: #27ae60;
+    box-shadow: 0 0 0 3px rgba(39,174,96,.28);
+    transform: scale(1.08);
+}
+
+.color-hint {
+    margin: 2px 0 4px;
+    font-size: .78rem;
+    font-weight: 700;
+    color: #e74c3c;
+}
+
+.color-swatch-row.shake {
+    animation: colorShake .4s;
+}
+
+@keyframes colorShake {
+    0%, 100% { transform: translateX(0); }
+    20%      { transform: translateX(-6px); }
+    40%      { transform: translateX(6px); }
+    60%      { transform: translateX(-4px); }
+    80%      { transform: translateX(4px); }
+}
+
 /* Cart Modal */
 .cart-modal {
     position: fixed;
@@ -907,6 +961,44 @@ body {
     padding: 6px 10px; border-radius: 10px; font-size: .78rem;
     font-weight: 700; cursor: pointer;
 }
+
+/* ══════════════════════════════════════════════════════════════
+   Admin: Color Variant rows in the Add/Edit Item form
+   Each row = one color name + its own image URL + a remove button.
+══════════════════════════════════════════════════════════════ */
+.ai-color-row {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 8px;
+    align-items: center;
+}
+.ai-color-row input {
+    padding: 8px 10px;
+    border: 1.5px solid #dfe6e9;
+    border-radius: 8px;
+    font-size: .9rem;
+    font-family: inherit;
+    box-sizing: border-box;
+    outline: none;
+    background: #fdfdfd;
+}
+.ai-color-row input:focus { border-color: #27ae60; }
+.ai-color-row .ai-color-name  { flex: 1; }
+.ai-color-row .ai-color-image { flex: 2; }
+.ai-color-row .ai-color-remove {
+    background: #e74c3c;
+    color: #fff;
+    border: none;
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    font-weight: 700;
+    cursor: pointer;
+    flex-shrink: 0;
+    line-height: 1;
+    transition: opacity .2s;
+}
+.ai-color-row .ai-color-remove:hover { opacity: .85; }
 
 /* ══════════════════════════════════════════════════════════════
    Store Locator
