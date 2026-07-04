@@ -402,9 +402,7 @@
             <button class="navbar-icon-btn" title="Cart" onclick="enterShop()">🛒</button>
             <button class="navbar-icon-btn" title="Account" onclick="toggleAccountMenu()">👤</button>
             <div id="account-dropdown" class="account-dropdown">
-                <span id="home-greeting"></span>
-                <button class="config-mode-btn" onclick="goToConfigMode()">⚙️ Config Mode</button>
-                <button onclick="handleHomeSignOut()">Sign Out</button>
+                <span>Loading…</span>
             </div>
         </div>
     </nav>
@@ -487,15 +485,24 @@
             return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
         }
 
-        // If there's no logged-in user, this page has no business being shown —
-        // send them back to the auth wall.
+        // This page is a public landing page — anyone should be able to see it,
+        // logged in or not (search engines and the AdSense crawler included).
+        // We only personalize the account menu when someone IS logged in.
         onAuthStateChanged(auth, (user) => {
-            if (!user) {
-                window.location.href = 'index.html';
-                return;
+            const dropdown = document.getElementById('account-dropdown');
+            if (user) {
+                const displayName = user.displayName || user.email;
+                dropdown.innerHTML = `
+                    <span id="home-greeting">Hi, ${escHtml(displayName)}</span>
+                    <button class="config-mode-btn" onclick="goToConfigMode()">⚙️ Config Mode</button>
+                    <button onclick="handleHomeSignOut()">Sign Out</button>
+                `;
+            } else {
+                dropdown.innerHTML = `
+                    <span>Sign in to shop &amp; track orders</span>
+                    <button onclick="enterShop()">Sign In</button>
+                `;
             }
-            const displayName = user.displayName || user.email;
-            document.getElementById('home-greeting').textContent = `Hi, ${displayName}`;
             loadFeaturedProducts();
         });
 
