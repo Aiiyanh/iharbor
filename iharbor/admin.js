@@ -12,6 +12,11 @@ import {
   writeBatch,
   getDocs
 } from "https://www.gstatic.com/firebasejs/11.9.1/firebase-firestore.js";
+import {
+  getAuth,
+  signInWithEmailAndPassword,
+  signOut
+} from "https://www.gstatic.com/firebasejs/11.9.1/firebase-auth.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyDBwDgss8kfJiYJMPRhma4kCPYdCyjvy58",
@@ -23,40 +28,69 @@ const firebaseConfig = {
   measurementId: "G-65T4KBFMLP"
 };
 
-const app = initializeApp(firebaseConfig);
-const db  = getFirestore(app);
+const app  = initializeApp(firebaseConfig);
+const db   = getFirestore(app);
+const auth = getAuth(app);
 
 // ─── Admin Auth ───────────────────────────────────────────────────────────────
+// The password box below is just a friendly UI gate. The REAL security is the
+// Firebase Auth sign-in it triggers on success — that's what Firestore rules
+// actually check. Create this account once in Firebase Console → Authentication
+// → Add user, using this exact email, and set its password to ADMIN_PASSWORD
+// below (or update ADMIN_PASSWORD to match whatever you set there).
+const ADMIN_EMAIL    = 'admin@iharbor.internal'; // ← must match the Firebase Auth user you create
 const ADMIN_PASSWORD = 'iharbor2026';
 let unsubscribeOrders = null; // holds the Firestore listener so we can detach on logout
 
 document.addEventListener('DOMContentLoaded', function () {
-  if (sessionStorage.getItem('iharbor_admin_logged_in') === 'true') {
-    showDashboard();
-  }
+  // Firebase persists the auth session across reloads, but it restores it
+  // asynchronously — so wait for onAuthStateChanged rather than trusting the
+  // sessionStorage flag alone (which is just a UI convenience, not security).
+  auth.onAuthStateChanged(user => {
+    if (user && sessionStorage.getItem('iharbor_admin_logged_in') === 'true') {
+      showDashboard();
+    } else if (!user) {
+      sessionStorage.removeItem('iharbor_admin_logged_in');
+    }
+  });
 
   document.getElementById('admin-password').addEventListener('keyup', function (e) {
     if (e.key === 'Enter') checkLogin();
   });
 });
 
-window.checkLogin = function () {
+window.checkLogin = async function () {
   const input   = document.getElementById('admin-password').value;
   const errorEl = document.getElementById('login-error');
+  const btn     = document.querySelector('.login-box button');
 
-  if (input === ADMIN_PASSWORD) {
-    sessionStorage.setItem('iharbor_admin_logged_in', 'true');
-    errorEl.textContent = '';
-    showDashboard();
-  } else {
+  if (input !== ADMIN_PASSWORD) {
     errorEl.textContent = 'Incorrect password. Try again.';
+    return;
+  }
+
+  errorEl.textContent = '';
+  if (btn) { btn.disabled = true; btn.textContent = 'Signing in…'; }
+
+  try {
+    // This is the real security boundary — Firestore rules check this
+    // session, not the password box above.
+    await signInWithEmailAndPassword(auth, ADMIN_EMAIL, ADMIN_PASSWORD);
+    sessionStorage.setItem('iharbor_admin_logged_in', 'true');
+    showDashboard();
+  } catch (err) {
+    console.error('Admin auth sign-in failed:', err);
+    errorEl.textContent = 'Could not verify admin session. Check console for details.';
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'Login'; }
   }
 };
 
-window.logout = function () {
+window.logout = async function () {
   sessionStorage.removeItem('iharbor_admin_logged_in');
   // Detach Firestore listener
   if (unsubscribeOrders) { unsubscribeOrders(); unsubscribeOrders = null; }
+  try { await signOut(auth); } catch (err) { console.error('Sign-out failed:', err); }
   document.getElementById('admin-dashboard').style.display = 'none';
   document.getElementById('login-screen').style.display   = 'flex';
   document.getElementById('admin-password').value         = '';
