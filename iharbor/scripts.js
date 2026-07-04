@@ -1589,14 +1589,19 @@ async function loadManageProductsList() {
   listEl.innerHTML = '<li style="color:#7f8c8d;font-size:.85rem;">Loading…</li>';
 
   try {
-    const snap = await getDocs(query(collection(db, 'products'), orderBy('createdAt', 'asc')));
-    if (snap.empty) {
+    const snap = await getDocs(collection(db, 'products'));
+    const docs = snap.docs.slice().sort((a, b) => {
+      const aTime = a.data().createdAt?.toMillis ? a.data().createdAt.toMillis() : 0;
+      const bTime = b.data().createdAt?.toMillis ? b.data().createdAt.toMillis() : 0;
+      return aTime - bTime;
+    });
+    if (docs.length === 0) {
       listEl.innerHTML = '<li style="color:#7f8c8d;font-size:.85rem;font-style:italic;">No products yet.</li>';
       return;
     }
     listEl.innerHTML = '';
     productsCache = {};
-    snap.forEach(d => {
+    docs.forEach(d => {
       const p  = d.data();
       productsCache[d.id] = p;
       const li = document.createElement('li');
@@ -1715,7 +1720,18 @@ async function loadManageAddonsList() {
 // ── Render Firestore products into the shop sections ─────────────────────────
 async function renderProductsFromFirestore() {
   try {
-    const snap = await getDocs(query(collection(db, 'products'), orderBy('createdAt', 'asc')));
+    // NOTE: we intentionally do NOT use orderBy('createdAt') in the query itself.
+    // Firestore silently excludes any document that's missing the field an
+    // orderBy() sorts on — so a product saved without a createdAt (or whose
+    // serverTimestamp() hadn't fully resolved yet) would vanish from the shop
+    // even though it saved successfully. Fetching everything and sorting in
+    // JS avoids that trap.
+    const snap = await getDocs(collection(db, 'products'));
+    const docs = snap.docs.slice().sort((a, b) => {
+      const aTime = a.data().createdAt?.toMillis ? a.data().createdAt.toMillis() : 0;
+      const bTime = b.data().createdAt?.toMillis ? b.data().createdAt.toMillis() : 0;
+      return aTime - bTime;
+    });
 
     const bouquetsEl  = document.getElementById('bouquets-section');
     const souvenirsEl = document.getElementById('souvenirs-section');
@@ -1724,14 +1740,14 @@ async function renderProductsFromFirestore() {
     bouquetsEl.querySelectorAll('[data-dynamic]').forEach(el => el.remove());
     souvenirsEl.querySelectorAll('[data-dynamic]').forEach(el => el.remove());
 
-    if (snap.empty) {
+    if (docs.length === 0) {
       const emptyMsg = '<p data-dynamic="true" style="color:#7f8c8d;font-style:italic;padding:20px 0;">No products yet — check back soon!</p>';
       bouquetsEl.innerHTML  = emptyMsg;
       souvenirsEl.innerHTML = emptyMsg;
       return;
     }
 
-    snap.forEach(d => {
+    docs.forEach(d => {
       const p       = d.data();
       const section = p.category === 'souvenirs' ? souvenirsEl : bouquetsEl;
       const div     = document.createElement('div');
