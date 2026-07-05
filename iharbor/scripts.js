@@ -408,8 +408,7 @@ function filterProducts(rawTerm) {
     section.querySelectorAll('.product-item').forEach(item => {
       const nameEl = item.querySelector('p:not(.price)');
       const name   = nameEl ? nameEl.textContent.toLowerCase() : '';
-      const colors = (item.dataset.colors || '');
-      const match  = name.includes(term) || colors.includes(term);
+      const match  = name.includes(term);
       item.style.display = match ? '' : 'none';
       if (match) matchCount++;
     });
@@ -991,6 +990,7 @@ function cancelCheckout() {
 let unsubscribeMyOrders = null;
 let latestOrdersSnapshotData = []; // cached so reopening the modal is instant
 let lastSeenStatusByOrderId = {};  // used to detect status changes for the "updated" indicator
+let lastSeenFeeByOrderId    = {};  // used to detect delivery-fee changes for the "updated" indicator
 
 function statusToClass(status) {
   return 'status-' + String(status || 'new')
@@ -1044,15 +1044,26 @@ function startMyOrdersListener() {
   unsubscribeMyOrders = onSnapshot(q, snapshot => {
     const orders = snapshot.docs.map(d => ({ _id: d.id, ...d.data() }));
 
-    // Detect any status change since the last snapshot to drive the
-    // "Updated" badge on the My Orders menu item.
+    // Detect any status OR delivery-fee change since the last snapshot to
+    // drive the "Updated" badge on the My Orders menu item, and build a
+    // human-readable message describing exactly what changed.
     let hasNewUpdate = false;
+    const changeMessages = [];
     orders.forEach(o => {
       const prevStatus = lastSeenStatusByOrderId[o._id];
       if (prevStatus !== undefined && prevStatus !== o.status) {
         hasNewUpdate = true;
+        changeMessages.push(`Your order status changed to "${o.status}"`);
       }
       lastSeenStatusByOrderId[o._id] = o.status;
+
+      const prevFee = lastSeenFeeByOrderId[o._id];
+      const currFee = o.deliveryFee || 0;
+      if (prevFee !== undefined && prevFee !== currFee) {
+        hasNewUpdate = true;
+        changeMessages.push('Delivery fee changed on your order');
+      }
+      lastSeenFeeByOrderId[o._id] = currFee;
     });
 
     latestOrdersSnapshotData = orders;
@@ -1062,6 +1073,7 @@ function startMyOrdersListener() {
     const modalOpen = ordersModal && ordersModal.style.display !== 'none';
     if (hasNewUpdate && !modalOpen) {
       showOrdersUpdatedIndicator();
+      changeMessages.forEach(msg => showOrderToast(msg));
     }
   }, err => {
     console.error('Failed to listen for orders:', err);
@@ -1079,6 +1091,7 @@ function stopMyOrdersListener() {
   if (unsubscribeMyOrders) { unsubscribeMyOrders(); unsubscribeMyOrders = null; }
   latestOrdersSnapshotData = [];
   lastSeenStatusByOrderId  = {};
+  lastSeenFeeByOrderId     = {};
   hideOrdersUpdatedIndicator();
 }
 
@@ -1139,6 +1152,68 @@ function hideOrdersUpdatedIndicator() {
   const menuBtnDot = document.getElementById('menu-update-dot');
   if (menuDot) menuDot.classList.add('hidden');
   if (menuBtnDot) menuBtnDot.classList.add('hidden');
+}
+
+// ─── Order-change toast ───────────────────────────────────────────────────────
+// A small floating banner that tells the customer exactly what changed
+// ("Delivery fee changed on your order" / "Your order status changed to ...").
+// Built entirely in JS so no HTML/CSS file edits are needed.
+let _orderToastContainer = null;
+function getOrderToastContainer() {
+  if (_orderToastContainer && document.body.contains(_orderToastContainer)) {
+    return _orderToastContainer;
+  }
+  const container = document.createElement('div');
+  container.id = 'order-toast-container';
+  container.style.cssText = `
+    position: fixed;
+    top: 16px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 3000;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    align-items: center;
+    pointer-events: none;
+  `;
+  document.body.appendChild(container);
+  _orderToastContainer = container;
+  return container;
+}
+
+function showOrderToast(message) {
+  const container = getOrderToastContainer();
+  const toast = document.createElement('div');
+  toast.textContent = '🔔 ' + message;
+  toast.style.cssText = `
+    background: #1a5e36;
+    color: #fff;
+    padding: 10px 18px;
+    border-radius: 20px;
+    font-size: .88rem;
+    font-weight: 600;
+    box-shadow: 0 6px 18px rgba(0,0,0,.2);
+    opacity: 0;
+    transform: translateY(-8px);
+    transition: opacity .25s ease, transform .25s ease;
+    max-width: 90vw;
+    text-align: center;
+  `;
+  container.appendChild(toast);
+
+  // Fade in
+  requestAnimationFrame(() => {
+    toast.style.opacity   = '1';
+    toast.style.transform = 'translateY(0)';
+  });
+
+  // Fade out and remove after a few seconds
+  setTimeout(() => {
+    toast.style.opacity   = '0';
+    toast.style.transform = 'translateY(-8px)';
+    setTimeout(() => toast.remove(), 300);
+  }, 4000);
 }
 
 function toggleOrders() {
@@ -1800,9 +1875,6 @@ async function renderProductsFromFirestore() {
       const colors = Array.isArray(p.colors) ? p.colors.filter(c => c && c.name) : [];
       const initialImage = (colors.length && colors[0].image) ? colors[0].image : (p.image || '');
       div.dataset.selectedColor = '';
-      // Store all color-variant names on the card so the search box can match
-      // "red", "white", etc. even though those words never appear in the name.
-      div.dataset.colors = colors.map(c => c.name).join(',').toLowerCase();
 
       const swatchesHtml = colors.length ? `
         <div class="color-swatch-row" role="group" aria-label="Choose a color">
