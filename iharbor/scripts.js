@@ -1073,7 +1073,11 @@ function startMyOrdersListener() {
     const modalOpen = ordersModal && ordersModal.style.display !== 'none';
     if (hasNewUpdate && !modalOpen) {
       showOrdersUpdatedIndicator();
-      changeMessages.forEach(msg => showOrderToast(msg));
+      // Show right away (anchored below the burger menu) rather than
+      // waiting for the customer to open the menu.
+      changeMessages.forEach((msg, idx) => {
+        setTimeout(() => showOrderToast(msg), idx * 350);
+      });
     }
   }, err => {
     console.error('Failed to listen for orders:', err);
@@ -1157,8 +1161,10 @@ function hideOrdersUpdatedIndicator() {
 // ─── Order-change toast ───────────────────────────────────────────────────────
 // A small floating banner that tells the customer exactly what changed
 // ("Delivery fee changed on your order" / "Your order status changed to ...").
+// Appears right away, anchored just below the burger-menu button.
 // Built entirely in JS so no HTML/CSS file edits are needed.
-let _orderToastContainer = null;
+let _orderToastContainer  = null;
+
 function getOrderToastContainer() {
   if (_orderToastContainer && document.body.contains(_orderToastContainer)) {
     return _orderToastContainer;
@@ -1167,14 +1173,11 @@ function getOrderToastContainer() {
   container.id = 'order-toast-container';
   container.style.cssText = `
     position: fixed;
-    top: 16px;
-    left: 50%;
-    transform: translateX(-50%);
-    z-index: 3000;
+    z-index: 5000;
     display: flex;
     flex-direction: column;
     gap: 8px;
-    align-items: center;
+    align-items: flex-end;
     pointer-events: none;
   `;
   document.body.appendChild(container);
@@ -1182,22 +1185,37 @@ function getOrderToastContainer() {
   return container;
 }
 
+// Positions the toast container just under the burger-menu button itself,
+// right-aligned with it, recalculated each time we show a toast so it
+// stays correct even if the page has scrolled or resized.
+function positionOrderToastContainer(container) {
+  const menuBtn = document.getElementById('menu-toggle-btn');
+  if (!menuBtn) return;
+  const rect = menuBtn.getBoundingClientRect();
+  container.style.top   = (rect.bottom + 8) + 'px';
+  container.style.right = (window.innerWidth - rect.right) + 'px';
+  container.style.left  = 'auto';
+}
+
 function showOrderToast(message) {
   const container = getOrderToastContainer();
+  positionOrderToastContainer(container);
+
   const toast = document.createElement('div');
   toast.textContent = '🔔 ' + message;
+  toast.className = 'order-toast';
   toast.style.cssText = `
     background: #1a5e36;
     color: #fff;
     padding: 10px 18px;
     border-radius: 20px;
-    font-size: .88rem;
+    font-size: .85rem;
     font-weight: 600;
     box-shadow: 0 6px 18px rgba(0,0,0,.2);
     opacity: 0;
     transform: translateY(-8px);
     transition: opacity .25s ease, transform .25s ease;
-    max-width: 90vw;
+    max-width: min(90vw, 280px);
     text-align: center;
   `;
   container.appendChild(toast);
@@ -1207,14 +1225,24 @@ function showOrderToast(message) {
     toast.style.opacity   = '1';
     toast.style.transform = 'translateY(0)';
   });
+  // No auto-timeout here — the toast stays put until the customer clicks
+  // the burger menu, at which point dismissOrderToasts() fades it out.
+}
 
-  // Fade out and remove after a few seconds
-  setTimeout(() => {
+// Fades out and removes any order-change toasts currently on screen.
+// Called from shop.html the moment the burger menu button is clicked.
+function dismissOrderToasts() {
+  const container = _orderToastContainer;
+  if (!container) return;
+  const toasts = container.querySelectorAll('.order-toast');
+  toasts.forEach(toast => {
     toast.style.opacity   = '0';
     toast.style.transform = 'translateY(-8px)';
     setTimeout(() => toast.remove(), 300);
-  }, 4000);
+  });
 }
+window.dismissOrderToasts = dismissOrderToasts;
+
 
 function toggleOrders() {
   const modal     = document.getElementById('orders-modal');
