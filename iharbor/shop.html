@@ -630,6 +630,13 @@ We offer wide variety of fresh bouquets, customized bouquets, handmade bouquets 
             const dropdown = document.getElementById('dropdown-menu');
             const btn = document.getElementById('menu-toggle-btn');
             const isOpen = dropdown.classList.contains('show');
+
+            // Fade out any order-change notification the moment the
+            // customer clicks the burger button, whether opening or closing.
+            if (typeof window.dismissOrderToasts === 'function') {
+                window.dismissOrderToasts();
+            }
+
             if (isOpen) {
                 dropdown.classList.remove('show');
                 btn.classList.remove('open');
