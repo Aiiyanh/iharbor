@@ -498,7 +498,7 @@ function renderOrders(orders) {
 
   listEl.innerHTML = orders.map(order => {
     const itemsHtml = (order.items || [])
-      .map(i => `<li>${escapeHtml(i.name)} × ${i.quantity} — ₱${(i.price * i.quantity).toFixed(2)}</li>`)
+      .map(i => `<li>${escapeHtml(i.name)} × ${i.quantity} — ₱${(i.price * i.quantity).toFixed(2)}${i.notes ? `<br><span style="color:#27ae60;font-style:italic;">📝 ${escapeHtml(i.notes)}</span>` : ''}</li>`)
       .join('');
     const itemsSubtotal = (order.items || []).reduce((s, i) => s + i.price * i.quantity, 0);
 
